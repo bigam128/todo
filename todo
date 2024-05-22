@@ -1,0 +1,154 @@
+#!/bin/bash
+
+TODO_FILE="todo_list.json"
+
+initialize_todo_file() {
+    if [ ! -f "$TODO_FILE" ]; then
+        echo "[]" > "$TODO_FILE"
+    fi
+}
+show_usage() {
+    echo "Usage: todo [options]"
+    echo "Options:"
+    echo "  -c            Create a task"
+    echo "  -u <id>       Update a task"
+    echo "  -d <id>       Delete a task"
+    echo "  -s <id>       Show a task"
+    echo "  -l <date>     List tasks of a given day"
+    echo "  -t <title>    Search for a task by title"
+    echo "  -h            Help message"
+    exit 1
+}
+counter=0
+
+generate_id() {
+    echo "$((counter += 1))"
+}
+create_task() {
+    initialize_todo_file
+    echo "Enter title (required):"
+    read title
+    if [[ -z "$title" ]]; then
+        echo "Error: Title is required" >&2
+        exit 1
+    fi
+    echo "Enter description:"
+    read description
+    echo "Enter location:"
+    read location
+    echo "Enter due date and time (YYYY-MM-DD HH:MM) (required):"
+    read due_date
+    if [[ -z "$due_date" ]]; then
+        echo "Error: Due date is required" >&2
+        exit 1
+    fi
+    id=$(generate_id)
+    jq --arg id "$id" --arg title "$title" --arg desc "$description" --arg loc "$location" --arg due "$due_date" '. += [{"id": $id, "title": $title, "description": $desc, "location": $loc, "due_date": $due, "completed": 0}]' "$TODO_FILE" > tmp.$$.json && mv tmp.$$.json "$TODO_FILE"
+    echo "Task created with ID: $id"
+}
+
+update_task() {
+    id=$1
+    task=$(jq --arg id "$id" '.[] | select(.id==$id)' "$TODO_FILE")
+    if [ -z "$task" ]; then
+        echo "Error: Task ID not found" >&2
+        exit 1
+    fi
+    echo "Enter new title:"
+    read title
+    echo "Enter new description:"
+    read description
+    echo "Enter new location:"
+    read location
+    echo "Enter new due date and time:"
+    read due_date
+    echo "Enter completion marker (0 for incomplete, 1 for complete):"
+    read completion
+
+    jq --arg id "$id" --arg title "$title" --arg desc "$description" --arg loc "$location" --arg due "$due_date" --arg comp "$completion" '(.[] | select(.id==$id) | .title) |= if $title != "" then $title else . end | (.[] | select(.id==$id) | .description) |= if $desc != "" then $desc else . end | (.[] | select(.id==$id) | .location) |= if $loc != "" then $loc else . end | (.[] | select(.id==$id) | .due_date) |= if $due != "" then $due else . end | (.[] | select(.id==$id) | .completed) |= if $comp != "" then ($comp | tonumber) else . end' "$TODO_FILE" > tmp.$$.json && mv tmp.$$.json "$TODO_FILE"
+    echo "Task updated"
+}
+
+delete_task() {
+    id=$1
+    jq --arg id "$id" 'del(.[] | select(.id==$id))' "$TODO_FILE" > tmp.$$.json && mv tmp.$$.json "$TODO_FILE"
+    echo "Task deleted"
+}
+
+show_task() {
+    id=$1
+    task=$(jq --arg id "$id" '.[] | select(.id==$id)' "$TODO_FILE")
+    if [ -n "$task" ]; then
+        echo "$task" | jq .
+    else
+        echo "Error: Task ID not found" >&2
+    fi
+}
+
+list_tasks() {
+    date=$1
+    echo "Completed tasks on $date:"
+    jq --arg date "$date" '[.[] | select(.due_date | startswith($date) and .completed==1)]' "$TODO_FILE" | jq .
+    echo "Uncompleted tasks on $date:"
+    jq --arg date "$date" '[.[] | select(.due_date | startswith($date) and .completed==0)]' "$TODO_FILE" | jq .
+}
+
+search_task() {
+    title=$1
+    echo "Tasks with title containing '$title':"
+    jq --arg title "$title" '[.[] | select(.title | contains($title))]' "$TODO_FILE" | jq .
+}
+
+
+list_today_tasks() {
+    today=$(date '+%Y-%m-%d')
+
+    completed_tasks=$(jq --arg date "$today" '[.[] | select(.due_date | startswith($date) and .completed==1)]' "$TODO_FILE")
+    uncompleted_tasks=$(jq --arg date "$today" '[.[] | select(.due_date | startswith($date) and .completed==0)]' "$TODO_FILE")
+
+    if [ "$(echo "$completed_tasks" | jq length)" -eq 0 ] && [ "$(echo "$uncompleted_tasks" | jq length)" -eq 0 ]; then
+        echo "No tasks for today ($today)."
+    else
+        echo "Completed tasks for today ($today):"
+        echo "$completed_tasks" | jq .
+        echo "Uncompleted tasks for today ($today):"
+        echo "$uncompleted_tasks" | jq .
+    fi
+}
+
+initialize_todo_file
+
+if [[ $# -eq 0 ]]; then
+    list_today_tasks
+    exit 0
+fi
+
+while getopts ":cu:d:s:l:t:h" opt; do
+    case $opt in
+        c)
+            create_task
+            ;;
+        u)
+            update_task $OPTARG
+            ;;
+        d)
+            delete_task $OPTARG
+            ;;
+        s)
+            show_task $OPTARG
+            ;;
+        l)
+            list_tasks $OPTARG
+            ;;
+        t)
+            search_task $OPTARG
+            ;;
+        h)
+            show_usage
+            ;;
+        \?)
+            
+            list_today_tasks
+            ;;
+    esac
+done
