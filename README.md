@@ -36,6 +36,10 @@ The `todo` script is a command-line tool for managing todo tasks. It allows user
      ```bash
      cd todo
      ```
+   Make the script executable: 
+      ```bash
+      chmod +x todo
+      ```
    Run the script:
      ```bash
      ./todo
