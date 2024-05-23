@@ -11,18 +11,31 @@ The `todo` script is a command-line tool for managing todo tasks. It allows user
 ## Installation
 
 1. **Git:**
-   - If not already installed, install Git using your package manager:
+   - If not already installed, install Git using your package manager (linux):
      ```bash
      sudo apt update
      sudo apt install git
      ```
+     
+   - For MacOs:
+      ```bash
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      brew install git
+      ```
+     
 
-2. **jq:**
-   - If not already installed, install `jq` using your package manager:
+3. **jq:**
+   - If not already installed, install `jq` using your package manager (linux):
      ```bash
      sudo apt update
      sudo apt install jq
      ```
+     
+    - For MacOs:
+      ```bash
+      brew install jq
+      ```
+     
 
 ## How to Use
 
